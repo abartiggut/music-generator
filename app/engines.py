@@ -13,6 +13,7 @@ import io
 import json
 import math
 import random
+import re
 import struct
 import time
 import wave
@@ -30,6 +31,33 @@ def _fmt_time(seconds: int) -> str:
 
 class EngineError(Exception):
     pass
+
+
+class AudioCodesError(EngineError):
+    """The LM completed, but its audio conditioning cannot produce a song."""
+
+
+def _validate_audio_codes(codes) -> None:
+    if not codes:
+        raise AudioCodesError("Sprachmodell hat keine Audio-Codes geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.")
+    if isinstance(codes, str):
+        if not re.fullmatch(r"\s*\d+(?:\s*,\s*\d+)*\s*", codes):
+            raise AudioCodesError("Sprachmodell hat ungültige Audio-Codes geliefert.")
+        values = [int(value) for value in codes.split(",")]
+    elif isinstance(codes, list) and all(isinstance(value, int) and not isinstance(value, bool) for value in codes):
+        values = codes
+    else:
+        raise AudioCodesError("Sprachmodell hat ungültige Audio-Codes geliefert.")
+    if any(value < 0 or value >= 65536 for value in values):
+        raise AudioCodesError("Sprachmodell hat ungültige Audio-Codes geliefert.")
+    # ACE-Step uses five codes per second. Thirty seconds of an identical
+    # short pattern is collapsed conditioning, even if /lm reports success.
+    for period in range(1, 9):
+        repeated = 0
+        for index in range(period, len(values)):
+            repeated = repeated + 1 if values[index] == values[index - period] else 0
+            if repeated + period >= 150:
+                raise AudioCodesError("Sprachmodell hat eine lange Audio-Code-Schleife erzeugt. Bitte die Generierung erneut starten.")
 
 
 def _metadata_result(data, label: str) -> dict:
@@ -144,17 +172,28 @@ class AceStepCpp:
             req["lm_model"] = self.lm_model
         start = time.monotonic()   # zählt über beide Phasen (Sprachmodell + Synthese) durch
         async with httpx.AsyncClient(timeout=60) as c:
-            # 1) Sprachmodell: Songstruktur + Audio-Codes
-            r = await c.post(f"{self.lm_base}/lm", json=req)
-            if r.status_code >= 400:
-                raise EngineError(f"/lm: HTTP {r.status_code} {r.text[:300]}")
-            res = await self._wait(c, self.lm_base, str(r.json()["id"]), "Sprachmodell", start, progress)
-            try:
-                enriched = _metadata_result(res.json(), "Das Sprachmodell")
-            except (ValueError, UnicodeError) as error:
-                raise EngineError("Das Sprachmodell hat ungültiges JSON geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.") from error
-            if not enriched.get("audio_codes"):
-                raise EngineError("Sprachmodell hat keine Audio-Codes geliefert (LM auf Metal? LM-Server auf CPU nutzen)")
+            # 1) Sprachmodell: Songstruktur + Audio-Codes. A completed LM job
+            # can still collapse into a code loop. Retry only this phase with
+            # deterministic LM seeds; never render known-broken conditioning.
+            lm_seed = req.get("lm_seed", random.randrange(2**32))
+            for attempt in range(3):
+                req["lm_seed"] = (lm_seed + attempt) % 2**32
+                r = await c.post(f"{self.lm_base}/lm", json=req)
+                if r.status_code >= 400:
+                    raise EngineError(f"/lm: HTTP {r.status_code} {r.text[:300]}")
+                res = await self._wait(c, self.lm_base, str(r.json()["id"]), "Sprachmodell", start, progress)
+                try:
+                    enriched = _metadata_result(res.json(), "Das Sprachmodell")
+                except (ValueError, UnicodeError) as error:
+                    raise EngineError("Das Sprachmodell hat ungültiges JSON geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.") from error
+                try:
+                    _validate_audio_codes(enriched.get("audio_codes"))
+                except AudioCodesError:
+                    if attempt == 2:
+                        raise
+                    await progress(f"Audio-Codes unbrauchbar – neuer Versuch ({attempt + 2}/3)")
+                    continue
+                break
             enriched["output_format"] = req["output_format"]
             enriched["synth_model"] = req["synth_model"]
             if fixed_seed:
@@ -167,6 +206,7 @@ class AceStepCpp:
             res = await self._wait(c, self.base, str(r.json()["id"]), "Synthese", start, progress)
             audio, ext = _extract_audio(res)
         meta = {k: enriched.get(k) for k in ("bpm", "duration", "keyscale", "timesignature", "vocal_language", "lyrics", "caption")}
+        meta.update(lm_seed=req["lm_seed"], lm_attempts=attempt + 1)
         return audio, ext, meta
 
 

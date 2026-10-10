@@ -46,6 +46,7 @@ class FakeAceServer:
         self.requests = []
         self.missing_codes = False
         self.lm_result = None
+        self.lm_results = []
         self.analysis_result = [{"caption": "Analyzed fixture", "bpm": 92}]
         owner = self
 
@@ -72,7 +73,8 @@ class FakeAceServer:
                     if "result=1" not in self.path:
                         self.send({"status": "done"})
                     elif "id=lm" in self.path:
-                        self.send(owner.lm_result if owner.lm_result is not None else
+                        self.send(owner.lm_results.pop(0) if owner.lm_results else
+                                  owner.lm_result if owner.lm_result is not None else
                                   [{"audio_codes": [] if owner.missing_codes else [1, 2, 3], "caption": "fixture", "bpm": 92}])
                     elif "id=analysis" in self.path:
                         metadata = owner.analysis_result
@@ -240,6 +242,52 @@ class ApiTests(unittest.TestCase):
             self.assertTrue(any(route == "/synth" for route, _ in server.requests))
             synth_payload = next(payload for route, payload in server.requests if route == "/synth")
             self.assertEqual(synth_payload["seed"], 100)
+
+    def test_looped_audio_codes_retry_lm_before_synthesis(self):
+        with FakeAceServer() as server:
+            self.client.put("/api/settings", json={"engine": "acestep_cpp", "server_url": server.url,
+                                                    "lm_url": "", "poll_interval": .1})
+            collapsed = {"audio_codes": ",".join(["59905"] * 200), "caption": "fixture"}
+            healthy = {"audio_codes": ",".join(str(i) for i in range(1250)), "caption": "fixture"}
+            # Replay the same input twice: recovery must be reproducible as well.
+            for _ in range(2):
+                server.lm_results = [[collapsed], [healthy]]
+                sid = self.generate(instrumental=False, lyrics="Mir singe zäme, Schritt für Schritt")["ids"][0]
+                song = self.wait_song(sid)
+                self.assertEqual(song["status"], "done", song)
+                self.assertEqual(song["seed"], 100)
+                self.assertEqual(song["result_meta"]["lm_seed"], 101)
+                self.assertEqual(song["result_meta"]["lm_attempts"], 2)
+            lm_requests = [p for route, p in server.requests if route == "/lm"]
+            self.assertEqual([p["lm_seed"] for p in lm_requests], [100, 101, 100, 101])
+            self.assertTrue(all(p["seed"] == 100 for p in lm_requests))
+            self.assertTrue(all(p["lyrics"] == "Mir singe zäme, Schritt für Schritt" for p in lm_requests))
+            synth_requests = [p for route, p in server.requests if route == "/synth"]
+            self.assertEqual(len(synth_requests), 2)
+            self.assertTrue(all(p["audio_codes"] == healthy["audio_codes"] for p in synth_requests))
+
+    def test_persistent_audio_code_loops_stop_after_three_attempts(self):
+        with FakeAceServer() as server:
+            self.client.put("/api/settings", json={"engine": "acestep_cpp", "server_url": server.url,
+                                                    "lm_url": "", "poll_interval": .1})
+            for pattern in ([59905], [14344, 59905, 59913]):
+                with self.subTest(pattern=pattern):
+                    server.requests.clear()
+                    server.lm_result = [{"audio_codes": pattern * 200, "caption": "fixture"}]
+                    song = self.wait_song(self.generate()["ids"][0])
+                    self.assertEqual(song["status"], "error", song)
+                    self.assertIn("Audio-Code-Schleife", song["message"])
+                    self.assertEqual(len([r for r, _ in server.requests if r == "/lm"]), 3)
+                    self.assertFalse(any(r == "/synth" for r, _ in server.requests))
+
+    def test_audio_code_validation_accepts_short_repetitions_and_rejects_invalid_codes(self):
+        from app.engines import AudioCodesError, _validate_audio_codes
+        _validate_audio_codes([59905] * 30 + list(range(1250)))
+        _validate_audio_codes(" 1, 2, 3 ")
+        for malformed in ("junk", "1,,2", [True], [65536], [-1], {"code": 1}):
+            with self.subTest(codes=malformed):
+                with self.assertRaises(AudioCodesError):
+                    _validate_audio_codes(malformed)
 
     def test_invalid_generation_and_empty_download(self):
         self.assertEqual(self.client.post("/api/generate", json={"variants": 0}).status_code, 422)

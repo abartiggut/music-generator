@@ -48,7 +48,7 @@ läuft separat auf Port 18085; bestehende Dienste auf 8085 wurden erhalten.
 
 ## Automatisierte Tests und Grenzen
 
-25 Tests bestehen lokal unter Windows. Die GitHub-Actions-Matrix führt dieselben
+31 Tests bestehen lokal unter Windows. Die GitHub-Actions-Matrix führt dieselben
 Tests zusätzlich auf `windows-latest` und `ubuntu-latest` aus. Abgedeckt sind
 Queue, Varianten, WAV/ZIP, Favourites, Abbruch/Retry, reale HTTP-Protokollabfolge
 gegen einen kontrollierten Testserver, ungültige Modellantworten, Seed-Übergabe,
@@ -60,3 +60,30 @@ C++-Werkzeuge nicht ausgeführt. Der bewiesene GPU-Betriebsweg ist daher
 **native Windows-App mit CUDA-Engine auf GPU-Server**. Die Mac-Start-/Update-Regressionen
 sind isoliert getestet, die komplette Mac-Anwendung wurde in dieser Arbeit
 nicht neu installiert.
+
+## Soundloop bei weiteren Varianten (10. Oktober 2026)
+
+Bei «Teststück (lange Version B)» (Seed `2046023594`)
+lieferte das Sprachmodell formal erfolgreich 1247 Audio-Codes, davon nur 46
+verschiedene. Ein einzelner Code wiederholte sich über 80 Sekunden. Derselbe
+Seed reproduzierte die degenerierte Folge; `lm_seed=2046023595` lieferte 1250
+Codes mit 1002 verschiedenen Werten. Lyrics, Stil und Länge wurden vom
+Plus-Knopf korrekt übernommen. Der Fehler lag in der Modellantwort.
+
+Die App prüft nun Audio-Codes vor der Synthese: leere/ungültige Codes sowie
+mindestens 30 Sekunden eines exakt wiederholten Musters mit einer Länge von
+ein bis acht Codes führen zu einem erneuten Sprachmodell-Aufruf. Maximal drei
+Versuche, deterministisch aufeinanderfolgende LM-Seeds; der Synthese-Seed
+bleibt erhalten. Dauerhafte Fehler werden angezeigt, statt daraus Audio zu
+rendern. Ergebnis-Metadaten speichern den verwendeten LM-Seed und die Anzahl
+der Versuche. Das ist eine Prüfung auf diese konkrete Form von Modellkollaps,
+keine allgemeine Bewertung der Klangqualität.
+
+Live-Test über die Windows-App mit dem fehlerhaften Seed: Schleife erkannt,
+zweiter Versuch erfolgreich, danach Stereo-WAV mit 48 kHz / 16 Bit und exakt
+250 Sekunden in 41,03 Sekunden Gesamtzeit. Die Korrelation der Wellenform
+zwischen den Abschnitten 30–60 und 60–90 Sekunden sank von 0,988 bei B auf
+0,027 beim neuen Ergebnis. Die neue Variante bleibt als C in der Bibliothek;
+A und B wurden erhalten. Regressionstests prüfen automatische Erholung,
+Reproduzierbarkeit, unveränderte Lyrics/Synthese-Seeds, Abbruch nach drei
+erfolglosen Versuchen sowie Erhalt kurzer, zulässiger Wiederholungen.
