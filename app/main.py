@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import db, lifecycle, updater
 from .engines import EngineError, make_engine
@@ -97,6 +98,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Music Generator", lifespan=lifespan)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"], www_redirect=False)
 app.include_router(updater.router)
 
 

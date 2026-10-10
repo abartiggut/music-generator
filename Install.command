@@ -120,7 +120,8 @@ fi
   && git checkout --quiet "$ACESTEP_REV" \
   && git submodule update --init --recursive --quiet ) || abbruch "acestep.cpp konnte nicht auf Version $ACESTEP_REV gebracht werden."
 
-if "$ENGINE/build/ace-server" --help 2>&1 | head -1 | grep -q "$ACESTEP_REV"; then
+# The binary reports a short build hash; checkout remains pinned to the full commit.
+if "$ENGINE/build/ace-server" --help 2>&1 | head -1 | grep -q "${ACESTEP_REV:0:7}"; then
   echo "  bereits gebaut"
 else
   echo "  wird gebaut (dauert einige Minuten) …"

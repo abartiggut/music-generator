@@ -5,7 +5,7 @@ function Install-LocalEngine {
     $Build = Join-Path $Engine 'build-cuda'
     $Models = Join-Path $Engine 'models'
     $Data = Join-Path $Root 'data'
-    $Revision = 'b7ba6d9'
+    $Revision = 'b7ba6d9ce2f19ca7627fb8f340032c3ebe8ae253'
     $VsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (-not (Test-Path -LiteralPath $VsWhere)) { throw 'Visual C++ Build Tools 2022 fehlen: https://visualstudio.microsoft.com/visual-cpp-build-tools/ (Desktop development with C++).' }
     $VsPath = & $VsWhere -latest -products '*' -version '[17.0,18.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath

@@ -15,7 +15,7 @@ import sys
 import tarfile
 
 ENGINE_REPO = 'https://github.com/ServeurpersoCom/acestep.cpp.git'
-ENGINE_REV = 'b7ba6d9'
+ENGINE_REV = 'b7ba6d9ce2f19ca7627fb8f340032c3ebe8ae253'
 CUDA_BASE = 'https://developer.download.nvidia.com/compute/cuda/redist/'
 CUDA_PACKAGES = {
     'cuda_nvcc/linux-x86_64/cuda_nvcc-linux-x86_64-12.9.86-archive.tar.xz':

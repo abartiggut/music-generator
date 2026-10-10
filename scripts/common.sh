@@ -12,7 +12,7 @@ LM_PORT=8086      # ace-server Sprachmodell (nur im Modus "split", auf CPU)
 
 # Getestete acestep.cpp-Version; neuere könnten die API ändern.
 ACESTEP_REPO="https://github.com/ServeurpersoCom/acestep.cpp"
-ACESTEP_REV="b7ba6d9"
+ACESTEP_REV="b7ba6d9ce2f19ca7627fb8f340032c3ebe8ae253"
 HF_BASE="https://huggingface.co/Serveurperso/ACE-Step-1.5-GGUF/resolve/main"
 
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"

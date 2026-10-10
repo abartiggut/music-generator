@@ -9,7 +9,8 @@ Die GitHub-Actions-Matrix führt dieselben Tests unter Windows und Ubuntu aus.
 Die Tests brauchen weder CUDA noch Modell-Dateien, GPU-Server oder Internetzugang.
 
 - API: Warteschlange, Varianten/Seeds, Abbrechen/Wiederholen, Favoriten,
-  gültige WAV-Dateien, ZIP-Export und Validierung der Einstellungen.
+  gültige WAV-Dateien, ZIP-Export und Validierung der Einstellungen;
+  fremde Hostnamen werden blockiert, Update und Shutdown benötigen den Pflicht-Header.
 - Modellanbindung: Ein lokaler HTTP-Testserver bildet das ace-server-Protokoll
   ab. Generierung und Fehlerbehandlung laufen über echte HTTP-Anfragen.
 - Launcher: Echte Prozesse prüfen Start, Status, authentifizierten Neustart und

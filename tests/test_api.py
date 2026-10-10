@@ -117,7 +117,7 @@ class ApiTests(unittest.TestCase):
         self.settings.start()
         main._wakeup = asyncio.Event()
         main._running.clear()
-        self.client = TestClient(main.app)
+        self.client = TestClient(main.app, base_url="http://127.0.0.1")
         self.client.__enter__()
 
     def tearDown(self):
@@ -142,6 +142,31 @@ class ApiTests(unittest.TestCase):
                                                          "seed": 100, **overrides})
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    def test_local_hosts_are_accepted(self):
+        for host in ("localhost", "localhost:8765", "127.0.0.1", "127.0.0.1:8765"):
+            with self.subTest(host=host):
+                response = self.client.get("/", headers={"host": host})
+                self.assertEqual(response.status_code, 200, response.text)
+
+    def test_foreign_hosts_cannot_reach_update(self):
+        with patch.object(main.lifecycle, "begin_maintenance") as maintenance, \
+                patch.object(updater, "_apply") as apply_update:
+            for host in ("example.invalid", "localhost.example.invalid", "127.0.0.1.example.invalid"):
+                with self.subTest(host=host):
+                    self.assertEqual(self.client.get("/", headers={"host": host}).status_code, 400)
+                    response = self.client.post("/api/update/apply", headers={"host": host, "x-lang": "de"})
+                    self.assertEqual(response.status_code, 400, response.text)
+            maintenance.assert_not_called()
+            apply_update.assert_not_called()
+
+    def test_update_and_shutdown_require_custom_header(self):
+        with patch.object(main.lifecycle, "begin_maintenance") as maintenance:
+            for route in ("/api/update/apply", "/api/shutdown"):
+                with self.subTest(route=route):
+                    response = self.client.post(route, data={"x-lang": "de"})
+                    self.assertEqual(response.status_code, 422, response.text)
+            maintenance.assert_not_called()
 
     def test_variants_wav_favorites_and_zip(self):
         folder = self.client.post("/api/folders", json={"name": "Test"}).json()
