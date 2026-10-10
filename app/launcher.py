@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("MUSIC_GENERATOR_DATA_DIR", ROOT / "data")).resolve()
 STATE = DATA / "runtime.json"
-DEFAULTS = {"mode": "remote", "server_url": "", "ssh_host": "gpu-server", "remote_port": 18085,
+DEFAULTS = {"mode": "mock", "server_url": "", "ssh_host": "", "remote_port": 18085,
             "tunnel_port": 18085, "port": 8765, "no_browser": False}
 
 
@@ -321,6 +321,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "start":
             config = {**DEFAULTS, **read_json(DATA / "launcher.json")}
             config.update({k: v for k, v in vars(args).items() if k != "command" and v is not None})
+            if args.ssh_host is not None and args.mode is None:
+                config["mode"] = "remote"
             if args.server_url is not None:
                 if args.mode in {"local", "mock"}:
                     raise ValueError("--server-url requires remote mode")

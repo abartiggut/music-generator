@@ -1,7 +1,7 @@
 # Windows/GPU-Server-Test vom 10. Oktober 2026
 
 Die Windows-App wurde nativ unter Windows mit Python 3.12 getestet. Die echte
-Berechnung lief über ihren SSH-Tunnel zu `gpu-server` und dessen NVIDIA RTX PRO 6000
+Berechnung lief über ihren SSH-Tunnel zu einem Linux-GPU-Server mit NVIDIA RTX PRO 6000
 Blackwell Workstation Edition mit 96 GB VRAM. Engine: acestep.cpp `b7ba6d9`,
 CUDA 12.9.1, Architektur 120; LM 4B Q8, SFT Q8, VAE BF16. Alle vier Modelldateien
 wurden gegen die festen SHA-256-Prüfsummen im Manifest geprüft.
@@ -48,7 +48,7 @@ läuft separat auf Port 18085; bestehende Dienste auf 8085 wurden erhalten.
 
 ## Automatisierte Tests und Grenzen
 
-31 Tests bestehen lokal unter Windows. Die GitHub-Actions-Matrix führt dieselben
+33 Tests bestehen lokal unter Windows. Die GitHub-Actions-Matrix führt dieselben
 Tests zusätzlich auf `windows-latest` und `ubuntu-latest` aus. Abgedeckt sind
 Queue, Varianten, WAV/ZIP, Favourites, Abbruch/Retry, reale HTTP-Protokollabfolge
 gegen einen kontrollierten Testserver, ungültige Modellantworten, Seed-Übergabe,
@@ -57,13 +57,13 @@ lokaler Git-Änderungen.
 
 Der native Windows-CUDA-Build wurde hier mangels installierter Visual-Studio-
 C++-Werkzeuge nicht ausgeführt. Der bewiesene GPU-Betriebsweg ist daher
-**native Windows-App mit CUDA-Engine auf GPU-Server**. Die Mac-Start-/Update-Regressionen
+**native Windows-App mit CUDA-Engine auf einem Linux-GPU-Server**. Die Mac-Start-/Update-Regressionen
 sind isoliert getestet, die komplette Mac-Anwendung wurde in dieser Arbeit
 nicht neu installiert.
 
 ## Soundloop bei weiteren Varianten (10. Oktober 2026)
 
-Bei «Teststück (lange Version B)» (Seed `2046023594`)
+Bei der zweiten Variante eines 250 Sekunden langen Reggae-Teststücks (Seed `2046023594`)
 lieferte das Sprachmodell formal erfolgreich 1247 Audio-Codes, davon nur 46
 verschiedene. Ein einzelner Code wiederholte sich über 80 Sekunden. Derselbe
 Seed reproduzierte die degenerierte Folge; `lm_seed=2046023595` lieferte 1250

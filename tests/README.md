@@ -6,7 +6,7 @@ uv run --frozen python -m unittest discover -s tests -v
 ```
 
 Die GitHub-Actions-Matrix führt dieselben Tests unter Windows und Ubuntu aus.
-Die Tests brauchen weder CUDA noch Modell-Dateien, GPU-Server oder Internetzugang.
+Die Tests brauchen weder CUDA noch Modell-Dateien, einen GPU-Server oder Internetzugang.
 
 - API: Warteschlange, Varianten/Seeds, Abbrechen/Wiederholen, Favoriten,
   gültige WAV-Dateien, ZIP-Export und Validierung der Einstellungen;
@@ -24,5 +24,5 @@ Alle Bibliotheken, Zustandsdateien und Git-Repositories liegen in temporären
 Ordnern. `MUSIC_GENERATOR_DATA_DIR` wird vor dem Import des App-Moduls gesetzt;
 die vorhandene Bibliothek unter `data/` wird nicht verwendet.
 
-Musikalische Qualität, echte CUDA-Ausführung und die SSH-Verbindung zu GPU-Server
+Musikalische Qualität, echte CUDA-Ausführung und die SSH-Verbindung zum GPU-Server
 müssen separat mit der installierten Engine geprüft werden.

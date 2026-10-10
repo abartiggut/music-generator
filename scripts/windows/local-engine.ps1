@@ -23,7 +23,7 @@ function Install-LocalEngine {
         throw 'Dieser CUDA-Installer benoetigt Toolkit 12.8 oder neuer (inklusive Blackwell-Unterstuetzung).'
     }
     $NvidiaSmi = Find-WindowsTool 'nvidia-smi.exe'
-    if (-not $NvidiaSmi) { throw 'NVIDIA-Treiber/GPU nicht gefunden. Local benoetigt eine NVIDIA-CUDA-GPU; alternativ -Mode Ssh oder -Mode Mock.' }
+    if (-not $NvidiaSmi) { throw 'NVIDIA-Treiber/GPU nicht gefunden. Local benoetigt eine NVIDIA-CUDA-GPU; alternativ -Mode Ssh -SshHost GPU-SERVER oder -Mode Mock.' }
     Invoke-Checked $NvidiaSmi @('--query-gpu=name,memory.total','--format=csv,noheader')
     $Cmake = Find-WindowsTool 'cmake.exe'
     if (-not $Cmake) {

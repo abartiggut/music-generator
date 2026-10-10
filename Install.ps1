@@ -2,8 +2,8 @@
 .SYNOPSIS
 Installiert die Windows-App mit eigener Python-3.12-Umgebung.
 .DESCRIPTION
-Standard: GPU-Server via SSH (kein Modell-Download auf Windows). -Mode Mock verwendet
-Testklaenge, -Mode Remote -ServerUrl verbindet direkt, -Mode Local baut CUDA.
+Standard: Mock mit Testklaengen, ohne KI-Modelle. -Mode Ssh -SshHost verbindet
+einen eigenen GPU-Server, -Mode Remote -ServerUrl direkt, -Mode Local baut CUDA.
 Bestehende Startkonfiguration bleibt ohne explizite Parameter erhalten.
 .EXAMPLE
 .\Install.ps1 -Mode Mock -NoStart -NoBrowser
@@ -14,9 +14,9 @@ Bestehende Startkonfiguration bleibt ohne explizite Parameter erhalten.
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Ssh', 'Remote', 'Mock', 'Local')][string]$Mode = 'Ssh',
+    [ValidateSet('Ssh', 'Remote', 'Mock', 'Local')][string]$Mode = 'Mock',
     [string]$ServerUrl,
-    [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$')][string]$SshHost = 'gpu-server',
+    [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$')][string]$SshHost,
     [ValidateRange(1024, 65535)][int]$RemotePort = 18085,
     [ValidateRange(1024, 65535)][int]$TunnelPort = 18085,
     [ValidateRange(1024, 65535)][int]$Port = 8765,
@@ -39,12 +39,15 @@ try {
         $Saved = Get-Content -LiteralPath $ConfPath -Raw | ConvertFrom-Json
         foreach ($Property in $Saved.PSObject.Properties) { $Config[$Property.Name] = $Property.Value }
     }
-    $Defaults = @{ mode = 'remote'; server_url = ''; ssh_host = 'gpu-server'; remote_port = 18085; tunnel_port = 18085; port = 8765; no_browser = $false }
+    $Defaults = @{ mode = 'mock'; server_url = ''; ssh_host = ''; remote_port = 18085; tunnel_port = 18085; port = 8765; no_browser = $false }
     foreach ($Key in $Defaults.Keys) { if (-not $Config.ContainsKey($Key)) { $Config[$Key] = $Defaults[$Key] } }
     if ($PSBoundParameters.ContainsKey('Mode')) {
         $Config.mode = switch ($Mode) { 'Mock' { 'mock' }; 'Local' { 'local' }; default { 'remote' } }
         if ($Mode -eq 'Remote') { $Config.ssh_host = '' }
-        if ($Mode -eq 'Ssh') { $Config.ssh_host = $SshHost; $Config.server_url = '' }
+        if ($Mode -eq 'Ssh') {
+            if (-not $PSBoundParameters.ContainsKey('SshHost')) { throw '-Mode Ssh benoetigt -SshHost mit deinem eigenen SSH-Alias oder user@hostname.' }
+            $Config.ssh_host = $SshHost; $Config.server_url = ''
+        }
         if ($Mode -eq 'Local') { $Config.server_url = ''; $Config.ssh_host = '' }
     }
     foreach ($Entry in @{ServerUrl='server_url';SshHost='ssh_host';RemotePort='remote_port';TunnelPort='tunnel_port';Port='port';NoBrowser='no_browser'}.GetEnumerator()) {
@@ -56,10 +59,11 @@ try {
     }
     # An explicit URL implies a direct server unless an SSH host was explicit too.
     if ($PSBoundParameters.ContainsKey('ServerUrl')) {
-        if ($PSBoundParameters.ContainsKey('Mode') -and $Mode -in @('Mock','Local')) { throw '-ServerUrl gehoert zu -Mode Remote oder GPU-Server, nicht zu Mock/Local.' }
+        if ($PSBoundParameters.ContainsKey('Mode') -and $Mode -in @('Mock','Local')) { throw '-ServerUrl gehoert zu -Mode Remote oder Ssh, nicht zu Mock/Local.' }
         $Config.mode = 'remote'
         if (-not $PSBoundParameters.ContainsKey('SshHost')) { $Config.ssh_host = '' }
     }
+    if ($PSBoundParameters.ContainsKey('SshHost') -and -not $PSBoundParameters.ContainsKey('Mode')) { $Config.mode = 'remote' }
     if ($Config.mode -notin @('mock','remote','local')) { throw 'launcher.json: mode muss mock, remote oder local sein.' }
     foreach ($Key in @('port','remote_port','tunnel_port')) {
         $Number = $Config[$Key]

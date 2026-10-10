@@ -42,11 +42,18 @@ cd music-generator
 .\Install.cmd
 ```
 
-Standard: Windows-Web-App mit einer bereits eingerichteten Engine auf **GPU-Server**,
-erreichbar über den vorhandenen SSH-Alias `gpu-server`. Die App öffnet
-`http://127.0.0.1:8765`; der Tunnel verbindet die Engine auf Port `18085`.
-Ein anderer Rechner kann mit `-SshHost` gewählt werden. Der Windows-Installer
-installiert keine Software auf dem GPU-Rechner.
+Standard bei einer neuen Installation: **Mock-Modus mit Testklängen, ohne
+KI-Musikgenerierung**. Die App öffnet `http://127.0.0.1:8765`.
+Für echte KI-Musik eine lokale NVIDIA-GPU oder einen eigenen GPU-Server
+gemäss der Windows-Anleitung einrichten. Beispiel für einen eigenen SSH-Alias:
+
+```powershell
+.\Install.cmd -Mode Ssh -SshHost GPU-SERVER
+```
+
+`GPU-SERVER` ist ein Platzhalter für deinen eingerichteten SSH-Zugang.
+Der Windows-Installer installiert keine Software auf dem entfernten GPU-Rechner.
+Ein erneuter Aufruf ohne Parameter erhält die vorhandene lokale Konfiguration.
 
 Ohne GPU und ohne SSH zum Ausprobieren:
 

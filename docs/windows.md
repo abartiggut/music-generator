@@ -1,4 +1,4 @@
-# Windows und GPU-Server
+# Windows und eigene GPU-Server
 
 Die Oberfläche und Songbibliothek laufen nativ unter Windows. Die Musik berechnet
 wahlweise eine lokale NVIDIA-GPU oder eine entfernte acestep.cpp-Engine.
@@ -17,10 +17,12 @@ cd music-generator
 .\Install.cmd
 ```
 
-Beim ersten Aufruf ist **GPU-Server** der Standard. Dafür braucht es den Windows
-OpenSSH-Client und einen bereits funktionierenden Schlüsselzugang über `ssh gpu-server`.
-Der Installer prüft ihn ohne interaktive Passwortabfrage. Die Engine muss auf GPU-Server
-separat eingerichtet sein und auf `127.0.0.1:18085` laufen.
+Beim ersten Aufruf ist **Mock** der Standard: Testklänge ohne KI-Modelle oder
+Serververbindung. Für echte KI-Musik wähle eine der unten beschriebenen GPU-Modi.
+Der SSH-Modus benötigt den Windows-OpenSSH-Client und einen bereits eingerichteten
+Schlüsselzugang zu deinem eigenen GPU-Server. Der Installer prüft diesen ohne
+interaktive Passwortabfrage. Die Engine muss auf dem GPU-Server separat
+eingerichtet sein und auf `127.0.0.1:18085` laufen.
 
 Nach der Installation: `Music Generator ON.cmd` startet die App und öffnet den
 Browser; `Music Generator OFF.cmd` beendet sie. Die Web-App und der SSH-Tunnel
@@ -31,7 +33,7 @@ weitere Instanzen anzulegen. Fremde Prozesse auf belegten Ports werden nicht bee
 
 | Modus | Installationsaufruf | Berechnung |
 | --- | --- | --- |
-| SSH | `.\Install.cmd -Mode Ssh` | Engine auf GPU-Server über SSH-Tunnel |
+| SSH-Server | `.\Install.cmd -Mode Ssh -SshHost GPU-SERVER` | Eigene Engine über SSH-Tunnel |
 | Direkter Server | `.\Install.cmd -Mode Remote -ServerUrl http://SERVER:18085` | Bereits erreichbare Engine |
 | Test | `.\Install.cmd -Mode Mock` | Einfache Testklänge; ohne KI-Modell |
 | Lokale GPU | `.\Install.cmd -Mode Local -LmSize 4B` | Native Windows-CUDA-Engine |
@@ -40,14 +42,16 @@ Zum Moduswechsel zuerst `Music Generator OFF.cmd` ausführen und danach den
 Installer mit dem gewünschten Modus erneut starten. Ohne explizite Parameter
 erhält ein erneuter Installeraufruf die vorhandene Konfiguration und Bibliothek.
 
-Weitere Parameter: `-NoStart`, `-NoBrowser`, `-Port 8765`, `-SshHost gpu-server`,
+`GPU-SERVER` beziehungsweise `SERVER` sind Platzhalter für deinen eigenen Server.
+
+Weitere Parameter: `-NoStart`, `-NoBrowser`, `-Port 8765`, `-SshHost GPU-SERVER`,
 `-RemotePort 18085` und `-TunnelPort 18085`. Der letzte Port ist lokal auf Windows,
 der vorletzte ist auf dem GPU-Rechner. Web- und Modellport müssen unterschiedlich sein.
 
 Beispiel für einen anderen GPU-Rechner und andere Ports:
 
 ```powershell
-.\Install.cmd -Mode Ssh -SshHost musikserver -RemotePort 18085 -TunnelPort 18086 -Port 8766
+.\Install.cmd -Mode Ssh -SshHost GPU-SERVER -RemotePort 18085 -TunnelPort 18086 -Port 8766
 ```
 
 Ein direkter Server hat hier keine Benutzeranmeldung; verwende ihn nur in einem
@@ -78,7 +82,7 @@ Die aktuellen XL-Modelle der Python-Anwendung sind in diesem Fork nicht integrie
 Die offizielle Python-ACE-Step-API ist kein direkter Ersatz für die hier verwendete
 acestep.cpp-API.
 
-## Engine auf GPU-Server einrichten
+## Engine auf einem Linux-GPU-Server einrichten
 
 `scripts/remote/setup_engine.py` richtet die Engine ohne `sudo` ein. Voraussetzung:
 Linux x86_64 mit Blackwell-GPU, NVIDIA-Treiber für CUDA 12.9, `git`, `curl`, `g++`,
@@ -111,7 +115,7 @@ journalctl --user -u music-generator-engine -n 40 --no-pager
 ```
 
 Das Stoppen der Windows-App bricht ihren aktiven Auftrag ab und schliesst den
-Tunnel. Es beendet den Dienst auf GPU-Server nicht.
+Tunnel. Es beendet den Dienst auf dem GPU-Server nicht.
 
 ## Daten, Updates und Diagnose
 
@@ -161,4 +165,4 @@ Diese Tests enthalten keinen GPU-Benchmark und keine Bewertung der Klangqualitä
 
 Die Testklänge des Mock-Modus sind ausdrücklich keine Nachweise für funktionierende
 KI-Musikgenerierung. Ein nativer Windows-CUDA-Build braucht einen eigenen GPU-Test;
-ein Test über GPU-Server prüft stattdessen die Windows-App und den entfernten CUDA-Server.
+ein Test über SSH prüft stattdessen die Windows-App und den entfernten CUDA-Server.

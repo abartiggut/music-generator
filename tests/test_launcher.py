@@ -11,8 +11,10 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from unittest.mock import patch
 
 from test_api import FakeAceServer
+from app import launcher
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -111,6 +113,23 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(request_json(self.url + "/api/shutdown", {}, {"x-lang": "de"}), {"ok": True})
         self.wait(lambda: not (self.data / "runtime.json").exists())
         self.assertFalse(json.loads(self.cli("status").stdout)["running"])
+
+    def test_fresh_install_defaults_to_mock_without_ssh(self):
+        self.start()
+        self.assertEqual(request_json(self.url + "/api/runtime")["mode"], "mock")
+        self.assertFalse((self.data / "ssh-tunnel.log").exists())
+
+    def test_saved_ssh_connection_is_preserved_and_new_host_selects_remote(self):
+        saved = {"mode": "remote", "ssh_host": "gpu-server", "port": self.port,
+                 "remote_port": 19000, "tunnel_port": 19001}
+        (self.data / "launcher.json").write_text(json.dumps(saved))
+        with patch.object(launcher, "DATA", self.data), patch.object(launcher, "start", return_value=0) as start:
+            self.assertEqual(launcher.main(["start"]), 0)
+            self.assertEqual({key: start.call_args.args[0][key] for key in saved}, saved)
+            (self.data / "launcher.json").write_text("{}")
+            self.assertEqual(launcher.main(["start", "--ssh-host", "gpu-server"]), 0)
+            self.assertEqual(start.call_args.args[0]["mode"], "remote")
+            self.assertEqual(start.call_args.args[0]["ssh_host"], "gpu-server")
 
     def test_stale_state_never_terminates_unrelated_pid(self):
         unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],

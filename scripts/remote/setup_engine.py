@@ -1,4 +1,4 @@
-"""Install the pinned CUDA engine on GPU-Server without sudo or system-wide changes.
+"""Install the pinned CUDA engine on a Linux GPU server without system-wide changes.
 
 Run with Python 3.12: setup_engine.py --manifest models.json [--start].
 Only this application's source, toolchain, models and user service are managed.

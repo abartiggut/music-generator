@@ -210,7 +210,7 @@ class ApiTests(unittest.TestCase):
         before = self.client.get("/api/settings").json()
         for values in ({"engine": "bad"}, {"server_url": "file:///private"},
                        {"server_url": "http://"}, {"poll_interval": 0}, {"poll_interval": "nope"},
-                       {"timeout_minutes": -1}, {"lm_url": "ssh://gpu-server"}):
+                       {"timeout_minutes": -1}, {"lm_url": "ssh://example.invalid"}):
             with self.subTest(values=values):
                 self.assertEqual(self.client.put("/api/settings", json=values).status_code, 422)
                 self.assertEqual(self.client.get("/api/settings").json(), before)
