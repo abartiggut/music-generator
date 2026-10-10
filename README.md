@@ -1,3 +1,13 @@
+<p align="center">
+  <a href="https://github.com/abartiggut">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/branding/abartiggut-on-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="assets/branding/abartiggut-on-light.svg">
+      <img src="assets/branding/abartiggut-on-light.svg" alt="abartiggut – Steinbock mit Wortmarke" width="280">
+    </picture>
+  </a>
+</p>
+
 # Music Generator – Windows-Version von abartiggut
 
 > **Windows-Fork:** Dieses Repository ist ein Fork von
