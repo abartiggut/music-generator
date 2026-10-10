@@ -1,5 +1,11 @@
 # Music Generator – Windows-Version von abartiggut
 
+> **Windows-Fork:** Dieses Repository ist ein Fork von
+> [rabbitfiremediacreation/music-generator](https://github.com/rabbitfiremediacreation/music-generator).
+> **abartiggut hat diesen Fork für Windows angepasst, damit auch Nutzerinnen und
+> Nutzer von Windows 10/11 das Tool verwenden können.** Die Windows-Erweiterungen
+> werden in diesem Repository gepflegt.
+
 Eigene Songs mit einer lokalen oder entfernten Musik-Engine erzeugen.
 Web-Oberfläche für [ACE-Step 1.5](https://github.com/ace-step/ACE-Step-1.5) über
 [acestep.cpp](https://github.com/ServeurpersoCom/acestep.cpp) (CUDA, Metal oder CPU).
