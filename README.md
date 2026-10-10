@@ -1,17 +1,49 @@
 # Music Generator
 
-Eigene Songs lokal auf dem Mac erzeugen – ohne Limits, ohne Abo, ohne Cloud.
+Eigene Songs mit einer lokalen oder entfernten Musik-Engine erzeugen.
 Web-Oberfläche für [ACE-Step 1.5](https://github.com/ace-step/ACE-Step-1.5) über
-[acestep.cpp](https://github.com/ServeurpersoCom/acestep.cpp) (Metal).
+[acestep.cpp](https://github.com/ServeurpersoCom/acestep.cpp) (CUDA, Metal oder CPU).
 
-Ausführliche Anleitung mit Bildern: **[Installationsanleitung.pdf](Installationsanleitung.pdf)**
+Dieser [abartiggut-Fork](https://github.com/abartiggut/music-generator) ergänzt native
+Windows-Installation, kontrollierte Start-/Stoppsteuerung und einen SSH-Tunnel zu
+einem Linux-GPU-Rechner. Ursprung: [rabbitfiremediacreation/music-generator](https://github.com/rabbitfiremediacreation/music-generator).
 
-## Installation
+## Windows
+
+```powershell
+git clone https://github.com/abartiggut/music-generator.git
+cd music-generator
+.\Install.cmd
+```
+
+Standard: Windows-Web-App mit einer bereits eingerichteten Engine auf **GPU-Server**,
+erreichbar über den vorhandenen SSH-Alias `gpu-server`. Die App öffnet
+`http://127.0.0.1:8765`; der Tunnel verbindet die Engine auf Port `18085`.
+Ein anderer Rechner kann mit `-SshHost` gewählt werden. Der Windows-Installer
+installiert keine Software auf dem GPU-Rechner.
+
+Ohne GPU und ohne SSH zum Ausprobieren:
+
+```powershell
+.\Install.cmd -Mode Mock
+```
+
+Danach per Doppelklick **Music Generator ON.cmd** starten und
+**Music Generator OFF.cmd** stoppen. Die entfernte Engine wird separat verwaltet.
+Der Mock-Modus erzeugt Testklänge, keine KI-Musik.
+
+Weitere Modi, CUDA-Voraussetzungen, GPU-Server-Einrichtung, Tests und Fehlerbehebung:
+**[Windows-Anleitung](docs/windows.md)**.
+
+Die vorhandene **[Installationsanleitung.pdf](Installationsanleitung.pdf)** beschreibt
+die ursprüngliche Mac-Version.
+
+## Installation auf dem Mac
 
 Voraussetzungen: Mac mit Apple Silicon (M1–M4), mindestens 8 GB Arbeitsspeicher, 7–11 GB frei.
 
 ```bash
-git clone https://github.com/rabbitfiremediacreation/music-generator.git ~/MusicGenerator
+git clone https://github.com/abartiggut/music-generator.git ~/MusicGenerator
 open ~/MusicGenerator/Install.command
 ```
 

@@ -1,0 +1,12 @@
+{
+  "repo": "Serveurperso/ACE-Step-1.5-GGUF",
+  "revision": "666ac70204440867d8c01ba4b119cc79c95b370a",
+  "files": [
+    {"name": "Qwen3-Embedding-0.6B-Q8_0.gguf", "size": 784144960, "sha256": "972f23255e46adfe744a0eb9a0039f3c63988f65753b0968d776e8b27168c321"},
+    {"name": "acestep-5Hz-lm-4B-Q8_0.gguf", "size": 4457323648, "sha256": "972f91147a167f0c041f1b158d67985a82c0f6a852e68cdf70e46030cf08b1bc"},
+    {"name": "acestep-5Hz-lm-1.7B-Q8_0.gguf", "size": 1975837568, "sha256": "726f99a82f050b32ebc5c5e36acaa9d7acd06bfe5e579a62b00e0d0d6d0b7ec6"},
+    {"name": "acestep-5Hz-lm-0.6B-Q8_0.gguf", "size": 709846656, "sha256": "bdaf9e292d4470f31c19cafeaca1b74936a114667e3a85e5d33b65247e9908ec"},
+    {"name": "acestep-v15-sft-Q8_0.gguf", "size": 2549527936, "sha256": "17f1984e48aaab27b3eb8ccbf0b754a6656e677884c60ea7003845cfc0059b70"},
+    {"name": "vae-BF16.gguf", "size": 337420928, "sha256": "0599862ac5d15cd308e1d2e368373aea6c02e25ebd1737ad4a4562a0901b0ef8"}
+  ]
+}

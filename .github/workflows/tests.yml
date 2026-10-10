@@ -1,0 +1,21 @@
+name: Cross-platform tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+      - run: uv python install 3.12
+      - run: uv sync --frozen --python 3.12
+      - run: uv run --frozen python -m unittest discover -s tests -v

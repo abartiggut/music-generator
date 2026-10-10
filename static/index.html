@@ -187,20 +187,24 @@
 <dialog id="settingsDlg">
   <form method="dialog" id="settingsForm">
     <h2 class="col-title">Setup</h2>
+    <div class="field"><span class="lbl" data-i18n="connection">Verbindung</span>
+      <span id="runtimeInfo" class="small" role="status"></span>
+      <span id="connectionHint" class="small" data-i18n="connection_locked" hidden>Zum Wechseln die App stoppen und Install erneut mit dem gewünschten Modus ausführen.</span>
+    </div>
     <label class="field"><span class="lbl">Backend</span>
       <select name="engine">
         <option value="acestep_cpp">ACE-Step 1.5 (acestep.cpp)</option>
         <option value="mock" data-i18n="mock">Mock (Testton)</option>
       </select>
     </label>
-    <label class="field"><span class="lbl" title="DiT + VAE, auf Metal" data-i18n-title="synth_tip" data-i18n="synth_srv">Synthese-Server</span>
-      <input name="server_url" placeholder="http://127.0.0.1:8085">
+    <label class="field"><span class="lbl" title="Lokale oder entfernte Musik-Engine" data-i18n-title="synth_tip" data-i18n="synth_srv">Synthese-Server</span>
+      <input name="server_url" placeholder="http://127.0.0.1:18085">
     </label>
-    <label class="field"><span class="lbl" title="Sprachmodell, auf CPU. Leer = gleicher Server wie Synthese." data-i18n-title="lm_tip" data-i18n="lm_srv">Sprachmodell-Server</span>
-      <input name="lm_url" placeholder="http://127.0.0.1:8086">
+    <label class="field"><span class="lbl" title="Leer = gleicher Server wie Synthese." data-i18n-title="lm_tip" data-i18n="lm_srv">Sprachmodell-Server</span>
+      <input name="lm_url" placeholder="Leer = gleicher Server" data-i18n-ph="lm_ph">
     </label>
     <label class="field"><span class="lbl" data-i18n="timeout">Timeout (Min.)</span>
-      <input name="timeout_minutes" type="number" min="1" max="600">
+      <input name="timeout_minutes" type="number" min="1" max="240">
     </label>
     <div class="field"><span class="lbl" data-i18n="layout">Anordnung</span>
       <div class="seg" role="group" aria-label="Anordnung" data-i18n-aria="layout">
@@ -216,8 +220,9 @@
       <div class="upd-row"><button type="button" id="stopBtn" class="sek danger" data-i18n="stop">Server stoppen</button><span id="stopInfo" class="small"></span></div>
     </div>
     <div class="field"><span class="lbl">GitHub</span>
-      <div class="upd-row"><a href="https://github.com/rabbitfiremediacreation/music-generator" target="_blank" rel="noopener" class="sek" data-i18n="github">GitHub</a><span class="small" data-i18n="github_info">Quellcode und Anleitung</span></div>
+      <div class="upd-row"><a href="https://github.com/abartiggut/music-generator" target="_blank" rel="noopener" class="sek" data-i18n="github">GitHub</a><span class="small" data-i18n="github_info">Quellcode und Anleitung</span></div>
     </div>
+    <p id="settingsError" class="small err-t" role="alert" hidden></p>
     <div class="submit">
       <button value="cancel" class="sek" data-i18n="cancel">Abbrechen</button>
       <button value="save" id="saveBtn" class="aktion" data-i18n="save">SPEICHERN</button>

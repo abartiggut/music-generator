@@ -526,9 +526,20 @@ async function checkHealth() {
   } catch { el.className = "box small err"; el.textContent = t("backend_offline"); }
 }
 const dlg = $("#settingsDlg"), sf = $("#settingsForm");
+let runtime = { capabilities: {} };
+async function loadRuntime() {
+  runtime = await api("/api/runtime").catch(() => ({ mode: "direct", capabilities: {} }));
+  $("#runtimeInfo").textContent = t(`runtime_${runtime.mode || "direct"}`);
+  $("#connectionHint").hidden = !runtime.connection_locked;
+  for (const k of ["engine", "server_url", "lm_url"]) sf[k].disabled = !!runtime.connection_locked;
+  $("#stopBtn").disabled = !runtime.capabilities?.shutdown;
+  $("#stopBtn").title = runtime.capabilities?.shutdown ? "" : t("runtime_unmanaged");
+}
 $("#btnSettings").onclick = async () => {
   const s = await api("/api/settings");
   for (const k of ["engine", "server_url", "lm_url", "timeout_minutes"]) sf[k].value = s[k];
+  $("#settingsError").hidden = true;
+  await loadRuntime();
   dlg.showModal();
 };
 const saveSettings = () => api("/api/settings", { method: "PUT", body: JSON.stringify({
@@ -554,6 +565,7 @@ async function updCheck() {
   updList.replaceChildren(...r.changes.map(c => Object.assign(document.createElement("li"), { textContent: c })));
   updList.hidden = false;
   if (r.dirty) { updInfo.className = "small err-t"; updInfo.textContent += t("upd_dirty"); return; }
+  if (!runtime.capabilities?.update) { updInfo.textContent += " · " + t("runtime_unmanaged"); return; }
   if (r.needs_install) updInfo.textContent += t("upd_install");
   updApply.hidden = false;
 }
@@ -586,13 +598,28 @@ $("#stopBtn").onclick = async () => {
   } catch (e) { $("#stopInfo").className = "small err-t"; $("#stopInfo").textContent = e.message; refresh(); }
 };
 
-dlg.addEventListener("close", async () => { if (dlg.returnValue === "save") { await saveSettings(); checkHealth(); } });
+sf.addEventListener("submit", async (event) => {
+  if (event.submitter?.value !== "save") return;
+  event.preventDefault();
+  const button = $("#saveBtn");
+  button.disabled = true;
+  $("#settingsError").hidden = true;
+  try {
+    await saveSettings();
+    dlg.close("save");
+    checkHealth();
+  } catch (error) {
+    $("#settingsError").textContent = error.message;
+    $("#settingsError").hidden = false;
+  } finally { button.disabled = false; }
+});
 
 // Sprachumschalter (DE | EN)
 document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
 document.addEventListener("langchange", () => {
   showDur(); syncLyrics(); render(); renderFolders(); showLibStats(); checkHealth();
   updInfo.textContent = ""; updList.hidden = true; updApply.hidden = true;
+  loadRuntime();
 });
 
 checkHealth();

@@ -1,11 +1,15 @@
 """SQLite-Speicher für Songs (Metadaten) und Einstellungen."""
 import json
+import math
+import os
 import sqlite3
+import sys
 import threading
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
+DATA = Path(os.environ.get("MUSIC_GENERATOR_DATA_DIR", ROOT / "data")).resolve()
 SONGS_DIR = DATA / "songs"
 DB_PATH = DATA / "music.db"
 
@@ -26,9 +30,9 @@ _conf = _engine_conf()
 
 DEFAULT_SETTINGS = {
     "engine": "acestep_cpp",           # "acestep_cpp" oder "mock"
-    "server_url": "http://127.0.0.1:8085",   # Synthese (DiT + VAE, Metal)
+    "server_url": "http://127.0.0.1:8085" if sys.platform == "darwin" else "http://127.0.0.1:18085",
     # Sprachmodell: eigener CPU-Server (Modus split) oder leer = gleicher Server wie Synthese (single)
-    "lm_url": "" if _conf.get("MODE") == "single" else "http://127.0.0.1:8086",
+    "lm_url": "http://127.0.0.1:8086" if sys.platform == "darwin" and _conf.get("MODE") != "single" else "",
     "lm_model": _conf.get("LM_FILE", ""),     # leer = erstes Sprachmodell im Modellordner
     "poll_interval": 1.5,
     "timeout_minutes": 30,
@@ -38,7 +42,7 @@ _lock = threading.Lock()
 
 
 def connect() -> sqlite3.Connection:
-    DATA.mkdir(exist_ok=True)
+    DATA.mkdir(parents=True, exist_ok=True)
     SONGS_DIR.mkdir(exist_ok=True)
     con = sqlite3.connect(DB_PATH, check_same_thread=False)
     con.row_factory = sqlite3.Row
@@ -106,10 +110,37 @@ def get_settings() -> dict:
     # Früher gespeicherte Standardadresse des CPU-Servers: im Ein-Server-Modus läuft dort nichts
     if _conf.get("MODE") == "single" and s["lm_url"].rstrip("/") == "http://127.0.0.1:8086":
         s["lm_url"] = ""
+    for key in ("engine", "server_url", "lm_url", "lm_model"):
+        value = os.environ.get("MUSIC_GENERATOR_" + key.upper())
+        if value is not None:
+            s[key] = value
     return s
 
 
 def save_settings(values: dict) -> dict:
+    current = get_settings()
+    for key, value in values.items():
+        if key not in DEFAULT_SETTINGS:
+            raise ValueError(f"Unknown setting: {key}")
+        if key in {"engine", "server_url", "lm_url", "lm_model"} and os.environ.get("MUSIC_GENERATOR_INSTANCE_ID") and value != current[key]:
+            raise ValueError("Connection settings are controlled by the launcher. Stop the app and change data/launcher.json or run Install.ps1.")
+        if key == "engine" and (not isinstance(value, str) or value not in {"mock", "acestep_cpp"}):
+            raise ValueError("engine must be mock or acestep_cpp")
+        if key in {"server_url", "lm_url"}:
+            if not isinstance(value, str) or len(value) > 2048:
+                raise ValueError(f"{key} must be an HTTP(S) URL")
+            if not value and key == "lm_url":
+                continue
+            parts = urlsplit(value)
+            if parts.scheme not in {"http", "https"} or not parts.hostname or parts.username or parts.password or parts.query or parts.fragment:
+                raise ValueError(f"{key} must be an HTTP(S) URL without credentials, query or fragment")
+            _ = parts.port
+        if key in {"poll_interval", "timeout_minutes"}:
+            upper = 30 if key == "poll_interval" else 240
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not .1 <= value <= upper:
+                raise ValueError(f"{key} must be between 0.1 and {upper}")
+        if key == "lm_model" and (not isinstance(value, str) or len(value) > 256 or any(c in value for c in "\r\n")):
+            raise ValueError("lm_model must be a short model filename")
     for k, v in values.items():
         if k not in DEFAULT_SETTINGS:
             continue

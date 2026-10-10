@@ -8,6 +8,7 @@ import sys
 import tempfile
 import uuid
 import zipfile
+from contextlib import suppress
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 
-from . import db, updater
+from . import db, lifecycle, updater
 from .engines import EngineError, make_engine
 
 STATIC = db.ROOT / "static"
@@ -42,12 +43,12 @@ async def worker():
             continue
         sid = job["id"]
         db.execute("UPDATE songs SET status='running', message='0:00' WHERE id=?", (sid,))
-        engine = make_engine(db.get_settings())
 
         async def progress(msg: str):
             db.execute("UPDATE songs SET message=? WHERE id=? AND status='running'", (msg, sid))
 
         try:
+            engine = make_engine(db.get_settings())
             params = json.loads(job["params"])
             gen = asyncio.create_task(engine.generate(params, progress))
             _running.update(sid=sid, task=gen, engine=engine)
@@ -84,8 +85,15 @@ async def lifespan(app: FastAPI):
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     task = asyncio.create_task(worker())
     _wakeup.set()
-    yield
-    task.cancel()
+    try:
+        yield
+    finally:
+        if _running.get("engine"):
+            await _running["engine"].cancel()
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        db.execute("UPDATE songs SET status='cancelled', message='App beendet' WHERE status='running'")
 
 
 app = FastAPI(title="Music Generator", lifespan=lifespan)
@@ -104,34 +112,34 @@ async def no_cache(request, call_next):
 # ---------------------------------------------------------------- Modelle
 
 class GenerateRequest(BaseModel):
-    prompt: str = ""               # Idee / Beschreibung für den Song
-    style: str = ""                # Stilrichtung (Genre-Tags)
-    caption: str = ""              # nur für ältere Songs: fertiger Text; sonst aus style + prompt gebaut
-    lyrics: str = ""
+    prompt: str = Field("", max_length=8000)
+    style: str = Field("", max_length=8000)
+    caption: str = Field("", max_length=8000)
+    lyrics: str = Field("", max_length=20000)
     instrumental: bool = True
     keep_caption: bool = True      # True = Modell schreibt die Beschreibung nicht um
-    title: str = ""
-    duration: float = 0            # 0 = Modell entscheidet
-    bpm: int = 0
-    keyscale: str = ""
-    timesignature: str = ""
-    vocal_language: str = ""
-    seed: int = -1                 # -1 = zufällig (wird trotzdem gespeichert)
+    title: str = Field("", max_length=200)
+    duration: float = Field(0, ge=0, le=600, allow_inf_nan=False)
+    bpm: int = Field(0, ge=0, le=300)
+    keyscale: str = Field("", max_length=128)
+    timesignature: str = Field("", max_length=32)
+    vocal_language: str = Field("", max_length=128)
+    seed: int = Field(-1, ge=-1, le=2**31 - 1 - 49)
     variants: int = Field(1, ge=1, le=50)
-    inference_steps: int = 0
-    lm_temperature: float | None = None
-    group_id: str | None = None    # für "weitere Variante" einer bestehenden Gruppe
-    folder_id: str | None = None   # Ordner der Bibliothek, in dem die neuen Songs landen
+    inference_steps: int = Field(0, ge=0, le=200)
+    lm_temperature: float | None = Field(None, ge=0, le=2, allow_inf_nan=False)
+    group_id: str | None = Field(None, max_length=64)
+    folder_id: str | None = Field(None, max_length=64)
 
 
 class SongPatch(BaseModel):
     favorite: bool | None = None
-    title: str | None = None
+    title: str | None = Field(None, max_length=200)
     folder_id: str | None = None   # None/"" = unsortiert (nur ausgewertet, wenn mitgeschickt)
 
 
 class FolderIn(BaseModel):
-    name: str
+    name: str = Field(max_length=120)
 
 
 def letters() -> dict:
@@ -164,6 +172,8 @@ def song_out(r: dict, letter: dict | None = None) -> dict:
 
 @app.post("/api/generate")
 async def generate(req: GenerateRequest):
+    if lifecycle.maintenance:
+        raise HTTPException(409, "Die App wird aktualisiert oder beendet. Bitte warten.")
     group = req.group_id or uuid.uuid4().hex[:12]
     lyrics = "[Instrumental]" if req.instrumental else req.lyrics.strip()
     parts = [p.strip().strip(",") for p in (req.style, req.prompt) if p.strip()]
@@ -349,22 +359,32 @@ def get_settings():
 
 @app.put("/api/settings")
 def put_settings(values: dict):
-    return db.save_settings(values)
+    try:
+        return db.save_settings(values)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
 
 
 @app.post("/api/analyze")
 async def analyze(audio: UploadFile):
     """Song hochladen -> Modell liefert Stil, Tempo, Tonart, Lyrics als Vorschlag fürs Formular."""
-    if not (audio.content_type or "").startswith("audio/") and not audio.filename.lower().endswith((".wav", ".mp3", ".flac", ".m4a", ".ogg")):
+    if lifecycle.maintenance:
+        raise HTTPException(409, "Die App wird aktualisiert oder beendet. Bitte warten.")
+    if not (audio.content_type or "").startswith("audio/") and not (audio.filename or "").lower().endswith((".wav", ".mp3", ".flac", ".m4a", ".ogg")):
         raise HTTPException(415, "Bitte eine Audiodatei hochladen (WAV, MP3, FLAC, M4A, OGG).")
     data = await audio.read()
     if len(data) > 60 * 1024 * 1024:
         raise HTTPException(413, "Datei zu groß (max. 60 MB).")
     engine = make_engine(db.get_settings())
+    if lifecycle.maintenance:
+        raise HTTPException(409, "Die App wird aktualisiert oder beendet. Bitte warten.")
+    lifecycle.analyses += 1
     try:
         result = await engine.analyze(data, audio.filename or "upload")
     except EngineError as e:
         raise HTTPException(502, str(e) or "Analyse fehlgeschlagen") from e
+    finally:
+        lifecycle.analyses -= 1
     return {
         "caption": result.get("caption", ""),
         "lyrics": result.get("lyrics", ""),
@@ -378,7 +398,23 @@ async def analyze(audio: UploadFile):
 
 @app.post("/api/shutdown")
 async def shutdown(x_lang: str = Header()):   # Pflicht-Header: fremde Webseiten können ihn nicht mitschicken
-    """Führt „Music Generator OFF“ aus: beendet Web-App und Modellserver, schließt die Browser-Tabs."""
+    """Ask the owning supervisor to stop its web process and optional local services."""
+    if lifecycle.runtime_info()["managed"]:
+        try:
+            lifecycle.begin_maintenance("shutdown")
+        except RuntimeError as error:
+            raise HTTPException(409, str(error)) from error
+        try:
+            if _running.get("engine"):
+                await _running["engine"].cancel()
+            db.execute("UPDATE songs SET status='cancelled', message='App beendet' WHERE status IN ('queued','running')")
+            asyncio.get_running_loop().call_later(.5, lifecycle.request_action, "stop")
+        except Exception:
+            lifecycle.end_maintenance("shutdown")
+            raise
+        return {"ok": True}
+    if sys.platform != "darwin":
+        raise HTTPException(409, "Diese App wurde direkt gestartet. Im Terminal beenden oder künftig python -m app.launcher start verwenden.")
     script = db.ROOT / "Music Generator OFF.command"
     if not script.is_file():
         raise HTTPException(404, "Music Generator OFF.command fehlt")
@@ -386,6 +422,11 @@ async def shutdown(x_lang: str = Header()):   # Pflicht-Header: fremde Webseiten
     subprocess.Popen(["/bin/sh", "-c", 'sleep 0.5; exec bash "$0"', str(script)], cwd=db.ROOT, start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"ok": True}
+
+
+@app.get("/api/runtime")
+def runtime():
+    return {**lifecycle.runtime_info(), "connection_locked": lifecycle.runtime_info()["managed"]}
 
 
 @app.get("/api/health")
