@@ -67,10 +67,15 @@ die ursprüngliche Mac-Version.
 
 ## Installation auf dem Mac
 
+Für macOS empfehlen wir die **[Mac-Version im Original-Repository](https://github.com/rabbitfiremediacreation/music-generator)**.
+Dieser abartiggut-Fork wird für die Windows-Version gepflegt. Die folgenden
+Mac-Hinweise beziehen sich auf das Originalprojekt; dessen aktuelle Anleitung
+findest du **[direkt beim Original](https://github.com/rabbitfiremediacreation/music-generator#installation)**.
+
 Voraussetzungen: Mac mit Apple Silicon (M1–M4), mindestens 8 GB Arbeitsspeicher, 7–11 GB frei.
 
 ```bash
-git clone https://github.com/abartiggut/music-generator.git ~/MusicGenerator
+git clone https://github.com/rabbitfiremediacreation/music-generator.git ~/MusicGenerator
 open ~/MusicGenerator/Install.command
 ```
 
@@ -87,12 +92,12 @@ Der Installer
 Er kann jederzeit erneut laufen; Erledigtes wird übersprungen.
 Optionen: `--yes` (keine Rückfragen), `--lm 0.6B|1.7B|4B`, `--no-start`.
 
-## Benutzen
+## Benutzen auf dem Mac
 
 - **Music Generator ON** startet Modellserver und App und öffnet http://localhost:8765
 - **Music Generator OFF** beendet alles und schließt die Browser-Tabs
 
-## Aktualisieren
+## Aktualisieren auf dem Mac
 
 In der App: Zahnrad › **Nach Updates suchen** › **Jetzt aktualisieren** (holt die neue Fassung von GitHub und startet die App neu; ändert sich acestep.cpp, weist sie auf den Installer hin). Oder von Hand:
 
@@ -117,7 +122,7 @@ Songs und Einstellungen in `data/` bleiben erhalten.
 | `engine/` | acestep.cpp und Modelle (vom Installer, nicht im Repo) |
 | `data/` | Songs, Datenbank, Logs, `engine.conf` (nicht im Repo) |
 
-## Grafikchip und die zwei Modi
+## Mac-Grafikchip und die zwei Modi
 
 Auf dem Apple M4 liefert das Sprachmodell unter Metal in acestep.cpp `b7ba6d9` fehlerhafte Ergebnisse
 (0 Audio-Codes). Der Installer erkennt das mit einem kurzen Probelauf und schreibt nach `data/engine.conf`:
