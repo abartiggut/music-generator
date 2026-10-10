@@ -143,7 +143,7 @@ Description=Music Generator ACE-Step CUDA engine
 Type=simple
 WorkingDirectory={source}
 Environment="LD_LIBRARY_PATH={cuda / 'lib'}"
-ExecStart={source / 'build/ace-server'} --models {source / 'models'} --host 127.0.0.1 --port {args.port} --max-batch 1
+ExecStart={source / 'build/ace-server'} --models {source / 'models'} --host 127.0.0.1 --port {args.port} --max-batch 1 --no-fa --clamp-fp16
 Restart=on-failure
 RestartSec=5
 
@@ -151,7 +151,9 @@ RestartSec=5
 WantedBy=default.target
 '''
     unit.parent.mkdir(parents=True, exist_ok=True)
-    if unit.exists() and unit.read_text() != content:
+    previous = unit.read_text() if unit.exists() else None
+    legacy = content.replace(' --no-fa --clamp-fp16', '')
+    if previous is not None and previous not in (content, legacy):
         raise RuntimeError(f'Existing different user service preserved: {unit}')
     unit.write_text(content)
     (base / 'installation.json').write_text(json.dumps({
@@ -167,7 +169,7 @@ WantedBy=default.target
         active = subprocess.run(['systemctl', '--user', 'is-active', '--quiet', unit.stem]).returncode == 0
         if occupied and not active:
             raise RuntimeError(f'Port {args.port} is occupied; existing listener preserved.')
-        run('systemctl', '--user', 'start', unit.stem)
+        run('systemctl', '--user', 'restart' if active and previous != content else 'start', unit.stem)
     print(f'Ready. Start: systemctl --user start {unit.stem}', flush=True)
 
 

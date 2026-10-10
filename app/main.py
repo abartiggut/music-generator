@@ -399,6 +399,8 @@ async def analyze(audio: UploadFile):
 @app.post("/api/shutdown")
 async def shutdown(x_lang: str = Header()):   # Pflicht-Header: fremde Webseiten können ihn nicht mitschicken
     """Ask the owning supervisor to stop its web process and optional local services."""
+    if lifecycle.analyses:
+        raise HTTPException(409, "Eine Audioanalyse läuft noch. Bitte vor dem Beenden warten.")
     if lifecycle.runtime_info()["managed"]:
         try:
             lifecycle.begin_maintenance("shutdown")

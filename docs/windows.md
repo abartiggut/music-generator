@@ -70,6 +70,10 @@ oder `0.6B` gewählt werden. Diese Auswahl ist keine Garantie für einen bestimm
 Speicherbedarf bei beliebiger Songlänge.
 
 Das Klangmodell ist derzeit SFT Q8, die Ausgabe WAV mit 48 kHz und 16 Bit.
+Die CUDA-Starts verwenden `--no-fa --clamp-fp16`: Im Blackwell-Test lieferte
+die ursprüngliche Konfiguration bei der Audioanalyse ungültige LM-Ausgabe.
+Diese Kombination ergab gültige Metadaten; sie wird deshalb auch beim
+lokalen CUDA-Start verwendet. Ein fester Seed steuert beide Modellphasen.
 Die aktuellen XL-Modelle der Python-Anwendung sind in diesem Fork nicht integriert.
 Die offizielle Python-ACE-Step-API ist kein direkter Ersatz für die hier verwendete
 acestep.cpp-API.
@@ -120,6 +124,9 @@ Verbindungseinstellungen sind während eines verwalteten Starts im Setup gesperr
 der Installer beziehungsweise die Startkonfiguration bestimmt sie. Der Timeout
 bleibt einstellbar. Beim Stoppen werden wartende und laufende Aufträge abgebrochen;
 sie können in der Bibliothek erneut gestartet werden.
+Während einer laufenden Audioanalyse weist der Stop-Knopf das Beenden mit einem
+Hinweis ab (HTTP 409). Danach kann erneut gestoppt werden. Ungültige
+Modellantworten werden verständlich angezeigt.
 
 Updates werden ausschliesslich von `abartiggut/music-generator`, Branch `main`,
 geholt. Lokale Änderungen, neue unversionierte Dateien, eigene Commits oder ein

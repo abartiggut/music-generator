@@ -34,6 +34,7 @@ Der Mock-Modus erzeugt Testklänge, keine KI-Musik.
 
 Weitere Modi, CUDA-Voraussetzungen, GPU-Server-Einrichtung, Tests und Fehlerbehebung:
 **[Windows-Anleitung](docs/windows.md)**.
+Ergebnisse der echten Blackwell- und Windows-Tests: **[Testbericht](docs/test-report.md)**.
 
 Die vorhandene **[Installationsanleitung.pdf](Installationsanleitung.pdf)** beschreibt
 die ursprüngliche Mac-Version.

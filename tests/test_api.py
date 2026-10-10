@@ -45,6 +45,8 @@ class FakeAceServer:
     def __init__(self):
         self.requests = []
         self.missing_codes = False
+        self.lm_result = None
+        self.analysis_result = [{"caption": "Analyzed fixture", "bpm": 92}]
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -60,17 +62,24 @@ class FakeAceServer:
                 self.wfile.write(body)
 
             def do_POST(self):
-                payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                body = self.rfile.read(int(self.headers["Content-Length"]))
+                payload = None if self.path == "/understand" else json.loads(body)
                 owner.requests.append((self.path, payload))
-                self.send({"id": "lm" if self.path == "/lm" else "synth"})
+                self.send({"id": {"/lm": "lm", "/understand": "analysis"}.get(self.path, "synth")})
 
             def do_GET(self):
                 if self.path.startswith("/job"):
                     if "result=1" not in self.path:
                         self.send({"status": "done"})
                     elif "id=lm" in self.path:
-                        self.send([{"audio_codes": [] if owner.missing_codes else [1, 2, 3],
-                                    "caption": "fixture", "bpm": 92}])
+                        self.send(owner.lm_result if owner.lm_result is not None else
+                                  [{"audio_codes": [] if owner.missing_codes else [1, 2, 3], "caption": "fixture", "bpm": 92}])
+                    elif "id=analysis" in self.path:
+                        metadata = owner.analysis_result
+                        metadata = metadata if isinstance(metadata, bytes) else json.dumps(metadata).encode()
+                        body = (b'--fixture\r\nContent-Type: application/json\r\n\r\n' + metadata +
+                                b'\r\n--fixture\r\nContent-Type: application/octet-stream\r\n\r\nlatents\r\n--fixture--\r\n')
+                        self.send(body, 'multipart/mixed; boundary="fixture"')
                     else:
                         self.send(wav_bytes(), "audio/wav")
                 elif self.path == "/props":
@@ -200,15 +209,42 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(song["engine"], "acestep_cpp")
             lm_payload = next(payload for route, payload in server.requests if route == "/lm")
             self.assertEqual(lm_payload["seed"], 100)
+            self.assertEqual(lm_payload["lm_seed"], 100)
             self.assertEqual(lm_payload["output_format"], "wav16")
             self.assertEqual(lm_payload["lyrics"], "[Instrumental]")
             self.assertTrue(any(route == "/synth" for route, _ in server.requests))
+            synth_payload = next(payload for route, payload in server.requests if route == "/synth")
+            self.assertEqual(synth_payload["seed"], 100)
 
     def test_invalid_generation_and_empty_download(self):
         self.assertEqual(self.client.post("/api/generate", json={"variants": 0}).status_code, 422)
         self.assertEqual(self.client.post("/api/generate", json={"prompt": ""}).status_code, 422)
         self.assertEqual(self.client.get("/api/download").status_code, 404)
         self.assertEqual(self.client.get("/api/songs/missing").status_code, 404)
+
+    def test_invalid_model_results_report_clear_errors(self):
+        with FakeAceServer() as server:
+            response = self.client.put("/api/settings", json={"engine": "acestep_cpp", "server_url": server.url,
+                                                              "lm_url": "", "poll_interval": .1})
+            self.assertEqual(response.status_code, 200, response.text)
+            for malformed in ([], {}, [None], ["bad"], {"caption": 123}, b'not-json', b'["\xff"]'):
+                with self.subTest(analysis=repr(malformed)):
+                    server.analysis_result = malformed
+                    result = self.client.post("/api/analyze", files={"audio": ("test.wav", wav_bytes(), "audio/wav")})
+                    self.assertEqual(result.status_code, 502, result.text)
+                    self.assertIn("Audioanalyse", result.json()["detail"])
+                    self.assertEqual(main.lifecycle.analyses, 0)
+            for malformed in ([], {}, [None], ["bad"], {"caption": 123}, b'not-json'):
+                with self.subTest(lm=repr(malformed)):
+                    server.lm_result = malformed
+                    sid = self.generate()["ids"][0]
+                    song = self.wait_song(sid)
+                    self.assertEqual(song["status"], "error", song)
+                    self.assertIn("Sprachmodell", song["message"])
+                    self.assertNotIn("IndexError", song["message"])
+            self.assertFalse(any(route == "/synth" for route, _ in server.requests))
+            server.analysis_result = [{"caption": "Valid metadata after errors", "bpm": 92}]
+            self.assertEqual(self.client.post("/api/analyze", files={"audio": ("test.wav", wav_bytes(), "audio/wav")}).status_code, 200)
 
     def test_unmanaged_lifecycle_actions_do_not_spawn_processes(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(main.sys, "platform", "win32"), \
@@ -251,6 +287,51 @@ class ApiTests(unittest.TestCase):
         # A failed update must unlock the queue again.
         self.assertEqual(self.client.post("/api/generate", json={"prompt": "After failure",
                                                                 "duration": .1}).status_code, 200)
+
+    def test_active_analysis_blocks_shutdown_and_update_restart(self):
+        entered, release = threading.Event(), threading.Event()
+        responses = []
+
+        class SlowAnalysisEngine:
+            async def analyze(self, _audio, _filename):
+                entered.set()
+                if not await asyncio.to_thread(release.wait, 10):
+                    raise RuntimeError("Test did not release the analysis")
+                return {"caption": "Completed audio analysis"}
+
+        def submit_analysis():
+            responses.append(self.client.post("/api/analyze", files={"audio": ("test.wav", wav_bytes(), "audio/wav")}))
+
+        with patch.object(main, "make_engine", return_value=SlowAnalysisEngine()), \
+                patch.object(main.lifecycle, "runtime_info", return_value={"managed": True}), \
+                patch.object(main.lifecycle, "request_action") as action, \
+                patch.object(updater, "_apply") as apply_update, \
+                patch.object(updater, "_restart") as restart:
+            thread = threading.Thread(target=submit_analysis)
+            thread.start()
+            try:
+                self.assertTrue(entered.wait(timeout=5), "Analysis never entered the fixture")
+                shutdown = self.client.post("/api/shutdown", headers={"x-lang": "de"})
+                self.assertEqual(shutdown.status_code, 409, shutdown.text)
+                self.assertIn("Audioanalyse", shutdown.json()["detail"])
+                update = self.client.post("/api/update/apply", headers={"x-lang": "de"})
+                self.assertEqual(update.status_code, 409, update.text)
+                self.assertIn("Audioanalyse", update.json()["detail"])
+                self.assertEqual(main.lifecycle.maintenance, "")
+                action.assert_not_called()
+                apply_update.assert_not_called()
+                restart.assert_not_called()
+            finally:
+                release.set()
+                thread.join(timeout=10)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(responses), 1)
+            self.assertEqual(responses[0].status_code, 200, responses[0].text)
+            self.assertEqual(main.lifecycle.analyses, 0)
+        # Refused lifecycle actions leave the app usable after the analysis completes.
+        response = self.client.post("/api/generate", json={"prompt": "After analysis", "duration": .1})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.wait_song(response.json()["ids"][0])["status"], "done")
 
 
 if __name__ == "__main__":

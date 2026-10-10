@@ -207,7 +207,7 @@ def run(config: dict) -> int:
             if config.get("cuda_bin"):
                 model_env["PATH"] = config["cuda_bin"] + os.pathsep + model_env.get("PATH", "")
             model = spawn([str(executable), "--host", "127.0.0.1", "--port", str(config["tunnel_port"]),
-                           "--models", str(models), "--max-batch", "1"], "ace-server.log", env=model_env)
+                           "--models", str(models), "--max-batch", "1", "--no-fa", "--clamp-fp16"], "ace-server.log", env=model_env)
             deadline = time.monotonic() + 90
             while True:
                 try:

@@ -32,6 +32,29 @@ class EngineError(Exception):
     pass
 
 
+def _metadata_result(data, label: str) -> dict:
+    """One request expects one nonempty metadata object, never arbitrary JSON."""
+    message = f"{label} hat keine gültigen Metadaten geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen."
+    if isinstance(data, list):
+        data = data[0] if data else None
+    if not isinstance(data, dict) or not data:
+        raise EngineError(message)
+    for key in ("caption", "lyrics", "keyscale", "vocal_language"):
+        value = data.get(key)
+        if value is not None:
+            if not isinstance(value, str):
+                raise EngineError(message)
+            try:
+                value.encode("utf-8")
+            except UnicodeError as error:
+                raise EngineError(message) from error
+    for key in ("bpm", "duration"):
+        value = data.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)):
+            raise EngineError(message)
+    return data
+
+
 # Felder, die wir an ace-server durchreichen (Rest bleibt auf Server-Defaults)
 ACE_FIELDS = {
     "caption", "lyrics", "bpm", "duration", "keyscale", "timesignature",
@@ -109,6 +132,11 @@ class AceStepCpp:
 
     async def generate(self, params: dict, progress: Progress) -> tuple[bytes, str, dict]:
         req = {k: v for k, v in params.items() if k in ACE_FIELDS and v not in (None, "")}
+        seed = req.get("seed")
+        fixed_seed = isinstance(seed, int) and not isinstance(seed, bool) and seed >= 0
+        if fixed_seed:
+            # ace-server randomises the LM independently unless lm_seed is explicit.
+            req["lm_seed"] = seed
         req.setdefault("use_cot_caption", False)  # Prompt wörtlich übernehmen
         req["output_format"] = "wav16"            # 48 kHz / 16 Bit, verlustfrei
         req["synth_model"] = DIT_MODEL
@@ -121,13 +149,16 @@ class AceStepCpp:
             if r.status_code >= 400:
                 raise EngineError(f"/lm: HTTP {r.status_code} {r.text[:300]}")
             res = await self._wait(c, self.lm_base, str(r.json()["id"]), "Sprachmodell", start, progress)
-            enriched = res.json()
-            if isinstance(enriched, list):
-                enriched = enriched[0]
+            try:
+                enriched = _metadata_result(res.json(), "Das Sprachmodell")
+            except (ValueError, UnicodeError) as error:
+                raise EngineError("Das Sprachmodell hat ungültiges JSON geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.") from error
             if not enriched.get("audio_codes"):
                 raise EngineError("Sprachmodell hat keine Audio-Codes geliefert (LM auf Metal? LM-Server auf CPU nutzen)")
             enriched["output_format"] = req["output_format"]
             enriched["synth_model"] = req["synth_model"]
+            if fixed_seed:
+                enriched["seed"] = seed
 
             # 2) Synthese
             r = await c.post(f"{self.base}/synth", json=enriched)
@@ -146,15 +177,20 @@ class AceStepCpp:
             if r.status_code >= 400:
                 raise EngineError(f"/understand: HTTP {r.status_code} {r.text[:300]}")
             res = await self._wait(c, self.lm_base, str(r.json()["id"]), "Analyse", time.monotonic(), lambda _msg: asyncio.sleep(0))
-            data = _extract_json(res)
-            return data[0] if isinstance(data, list) else data
+            data = _metadata_result(_extract_json(res), "Die Audioanalyse")
+            if not {"caption", "lyrics", "bpm", "duration", "keyscale", "timesignature", "vocal_language"} & data.keys():
+                raise EngineError("Die Audioanalyse hat keine auswertbaren Metadaten geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.")
+            return data
 
 
 def _extract_json(res: httpx.Response):
     """/understand liefert wie /synth multipart/mixed: JSON-Teil (Metadaten) + Roh-Latents."""
     ctype = res.headers.get("content-type", "")
     if ctype.startswith("application/json"):
-        return res.json()
+        try:
+            return res.json()
+        except (ValueError, UnicodeError) as error:
+            raise EngineError("Die Audioanalyse hat ungültiges JSON geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.") from error
     if "multipart" not in ctype:
         raise EngineError(f"Unerwartete Antwort von /understand: {ctype}")
     msg = email.message_from_bytes(
@@ -162,7 +198,10 @@ def _extract_json(res: httpx.Response):
     )
     for part in msg.iter_parts():
         if part.get_content_type().startswith("application/json"):
-            return json.loads(part.get_payload(decode=True))
+            try:
+                return json.loads(part.get_payload(decode=True))
+            except (ValueError, UnicodeError, TypeError) as error:
+                raise EngineError("Die Audioanalyse hat ungültiges JSON geliefert. Bitte Modellserver und Sprachmodell-Konfiguration prüfen.") from error
     raise EngineError("Kein JSON-Teil in der /understand-Antwort gefunden")
 
 
