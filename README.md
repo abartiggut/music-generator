@@ -1,4 +1,4 @@
-# Music Generator
+# Music Generator – Windows-Version von abartiggut
 
 Eigene Songs mit einer lokalen oder entfernten Musik-Engine erzeugen.
 Web-Oberfläche für [ACE-Step 1.5](https://github.com/ace-step/ACE-Step-1.5) über
@@ -8,7 +8,17 @@ Dieser [abartiggut-Fork](https://github.com/abartiggut/music-generator) ergänzt
 Windows-Installation, kontrollierte Start-/Stoppsteuerung und einen SSH-Tunnel zu
 einem Linux-GPU-Rechner. Ursprung: [rabbitfiremediacreation/music-generator](https://github.com/rabbitfiremediacreation/music-generator).
 
-## Windows
+## Windows-Version herunterladen
+
+**[Windows-Version als ZIP herunterladen](https://github.com/abartiggut/music-generator/archive/refs/heads/main.zip)**
+
+Das ZIP enthält den Quellcode und den Windows-Installer `Install.cmd` für Windows
+10/11. ZIP entpacken und den gewünschten Betriebsmodus gemäss der
+**[Windows-Anleitung](docs/windows.md)** installieren. Die Musik-Engine und die
+Modelle werden separat eingerichtet; Voraussetzungen für eine lokale NVIDIA-GPU
+oder einen entfernten GPU-Server stehen in der Anleitung.
+
+Für Installation und spätere Updates über Git:
 
 ```powershell
 git clone https://github.com/abartiggut/music-generator.git
