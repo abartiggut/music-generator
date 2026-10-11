@@ -14,7 +14,8 @@
 > [rabbitfiremediacreation/music-generator](https://github.com/rabbitfiremediacreation/music-generator).
 > **abartiggut hat diesen Fork für Windows angepasst, damit auch Nutzerinnen und
 > Nutzer von Windows 10/11 das Tool verwenden können.** Die Windows-Erweiterungen
-> werden in diesem Repository gepflegt.
+> werden in diesem Repository gepflegt. **Wir unterstützen hier ausschliesslich
+> Windows.** Für macOS sind Anleitung und Support beim Originalprojekt zu finden.
 
 Eigene Songs mit einer lokalen oder entfernten Musik-Engine erzeugen.
 Web-Oberfläche für [ACE-Step 1.5](https://github.com/ace-step/ACE-Step-1.5) über
@@ -69,75 +70,25 @@ Weitere Modi, CUDA-Voraussetzungen, GPU-Server-Einrichtung, Tests und Fehlerbehe
 **[Windows-Anleitung](docs/windows.md)**.
 Ergebnisse der echten Blackwell- und Windows-Tests: **[Testbericht](docs/test-report.md)**.
 
-Die vorhandene **[Installationsanleitung.pdf](Installationsanleitung.pdf)** beschreibt
-die ursprüngliche Mac-Version.
+## macOS
 
-## Installation auf dem Mac
-
-Für macOS empfehlen wir die **[Mac-Version im Original-Repository](https://github.com/rabbitfiremediacreation/music-generator)**.
-Dieser abartiggut-Fork wird für die Windows-Version gepflegt. Die folgenden
-Mac-Hinweise beziehen sich auf das Originalprojekt; dessen aktuelle Anleitung
-findest du **[direkt beim Original](https://github.com/rabbitfiremediacreation/music-generator#installation)**.
-
-Voraussetzungen: Mac mit Apple Silicon (M1–M4), mindestens 8 GB Arbeitsspeicher, 7–11 GB frei.
-
-```bash
-git clone https://github.com/rabbitfiremediacreation/music-generator.git ~/MusicGenerator
-open ~/MusicGenerator/Install.command
-```
-
-Der Installer
-
-1. prüft Chip, Arbeitsspeicher und freien Platz,
-2. schlägt das passende Sprachmodell vor (0.6B unter 12 GB, 1.7B bis 24 GB, 4B darüber),
-3. installiert was fehlt: Apple-Entwicklerwerkzeuge, `uv`, `cmake` (ohne Homebrew, ohne Passwort),
-4. baut acestep.cpp in der getesteten Version (`b7ba6d9`),
-5. lädt nur die benötigten Modelle (fortsetzbar),
-6. testet, ob das Sprachmodell auf dem Grafikchip richtig rechnet (sonst CPU, siehe unten),
-7. richtet die Symbole für **Music Generator ON / OFF** ein und startet die App.
-
-Er kann jederzeit erneut laufen; Erledigtes wird übersprungen.
-Optionen: `--yes` (keine Rückfragen), `--lm 0.6B|1.7B|4B`, `--no-start`.
-
-## Benutzen auf dem Mac
-
-- **Music Generator ON** startet Modellserver und App und öffnet http://localhost:8765
-- **Music Generator OFF** beendet alles und schließt die Browser-Tabs
-
-## Aktualisieren auf dem Mac
-
-In der App: Zahnrad › **Nach Updates suchen** › **Jetzt aktualisieren** (holt die neue Fassung von GitHub und startet die App neu; ändert sich acestep.cpp, weist sie auf den Installer hin). Oder von Hand:
-
-```bash
-cd ~/MusicGenerator && git pull
-open Install.command
-```
-
-Songs und Einstellungen in `data/` bleiben erhalten.
+Die **[Mac-Anleitung findest du im Original-Repository](https://github.com/rabbitfiremediacreation/music-generator#readme)**.
+Bitte verwende für macOS das Originalprojekt und richte Mac-Fragen an dessen
+Entwickler. Dieser Fork bietet Anleitung und Support für Windows.
 
 ## Aufbau
 
 | Pfad | Inhalt |
 |---|---|
-| `Install.command` | Installer |
-| `Music Generator ON/OFF.command` | Start und Stopp |
-| `scripts/common.sh` | gemeinsame Pfade, Ports, acestep.cpp-Version |
-| `scripts/metal_selftest.py` | Grafikchip-Test des Installers |
+| `Install.cmd` / `Install.ps1` | Windows-Installer |
+| `Music Generator ON.cmd` / `Music Generator OFF.cmd` | Windows-Start und -Stopp |
+| `scripts/windows/` | gemeinsame Windows-Funktionen und lokale Musik-Engine |
 | `app/` | FastAPI-Backend: Queue, Bibliothek, Anbindung an ace-server |
 | `static/` | Oberfläche |
-| `docs/anleitung/` | Quelle der Installationsanleitung. `capture.py` fotografiert die laufende App (`uv run --with websockets python docs/anleitung/capture.py`), `build_pdf.py` baut daraus das PDF (`uv run --with reportlab python docs/anleitung/build_pdf.py Installationsanleitung.pdf`) |
+| `docs/windows.md` | Windows-Anleitung |
+| `docs/test-report.md` | Ergebnisse der Windows- und GPU-Tests |
 | `engine/` | acestep.cpp und Modelle (vom Installer, nicht im Repo) |
 | `data/` | Songs, Datenbank, Logs, `engine.conf` (nicht im Repo) |
-
-## Mac-Grafikchip und die zwei Modi
-
-Auf dem Apple M4 liefert das Sprachmodell unter Metal in acestep.cpp `b7ba6d9` fehlerhafte Ergebnisse
-(0 Audio-Codes). Der Installer erkennt das mit einem kurzen Probelauf und schreibt nach `data/engine.conf`:
-
-- `MODE=split` – Sprachmodell auf der CPU (Port 8086), Klangerzeugung auf Metal (Port 8085)
-- `MODE=single` – alles auf einem Metal-Server (Port 8085)
-
-Nach einem Update von acestep.cpp (`ACESTEP_REV` in `scripts/common.sh`) testet der Installer neu.
 
 ## Lizenz der Modelle
 
